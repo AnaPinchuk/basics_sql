@@ -503,4 +503,103 @@ ORDER BY year;
 
 /* Лекция 5.
 Задание 1.
+Вытащить из таблицы tutorial.yammer_users все данные по user_id 10552
+Присоедините все записи из tutorial.yammer_events по ключу user_id
+Отфильтруйте таблицу по event_name = 'login'
+
+Сделайте тоже самое для юзера 10500
+Удивитесь
+Посмотрите есть ли в базе юзер 10500
 */
+
+SELECT * FROM tutorial.yammer_users AS t0
+JOIN tutorial.yammer_events t1 
+ON t0.user_id = t1.user_id
+WHERE tutorial.yammer_events.user_id = 10522 
+AND event_name = 'login';
+
+/* Лекция 5.
+Задание 2.
+Вытащить из таблицы tutorial.yammer_users, где company_id 1111
+Посчитайте количество уникальных пользователей
+Присоедините все записи из tutorial.yammer_events по ключу user_id
+Еще раз посчитайте количество уникальных пользователей
+*/
+
+SELECT COUNT(DISTINCT(t0.user_id))
+FROM tutorial.yammer_users AS t0
+JOIN tutorial.yammer_events AS t1 ON t0.user_id = t0.user_id
+WHERE t1.company_id = 1111;
+
+/* Лекция 5.
+Задание 3.
+Вытащить из таблицы tutorial.yammer_users количество уникальных пользователей
+с company_id = 100. Запомните это число
+
+Посмотрите есть ли в таблице tutorial.yammer_events события с пустым полем device
+Присоедините tutorial.yammer_events по ключу user_id. Сгруппируйте таблицу по device 
+и посмотрите на кол-во yammer_users.user_id в каждой группе.
+Откуда появилась группа с пустым device? 
+Почему уникальных пользователей больше, чем в оригинальной таблице?
+
+Поменяйте таблицу подсчета - посчитайте yammer_events.user_id
+Поменялись ли цифры?
+
+Уберите группировку и подтвердите свои догадки.
+*/
+SELECT COUNT(DISTINCT(user_id))
+FROM tutorial.yammer_users
+WHERE company_id = 100;
+
+SELECT device, COUNT(DISTINCT(t0.user_id))
+FROM tutorial.yammer_users AS t0
+LEFT JOIN tutorial.yammer_events AS t1
+ON t0.user_id = t1.user_id
+WHERE company_id = 100
+GROUP BY device;
+
+/* Лекция 5.
+Задание 4.
+Выберите все заказы из таблицы tutorial.orders
+Добавьте информацию про покупателя из tutorial.accounts с помощью
+RIGHT JOIN.
+
+Добавьте информацию про регионы из tutorial.regions.
+
+Выберите только строки, где контакт (primary_contact) зовут Barrie,
+с любой фамилией.
+
+Оставьте только регионы West или Northeast
+*/
+
+SELECT *
+FROM tutorial.orders AS t0
+RIGHT JOIN tutorial.accounts AS t1 
+ON t1.id = t0.account_id
+RIGHT JOIN tutorial.regions AS t2 
+ON t1.region_id = t2.id
+WHERE t2.name IN ('West', 'Northeast') 
+AND t1.primary_contact LIKE 'Barrie%';
+
+/* Лекция 5.
+Задание 5.
+Из таблиц yammer_experiments и yammer_emails одним запросом нужно понять,
+сколько уникальных пользователей участвовали
+
+1. Только в экспериментах
+2. Только в рассылках
+3. И в рассылках, и в экспериментах
+
+*/
+
+SELECT 
+CASE WHEN t0.user_id IS NULL THEN 'Not in experiments' 
+     WHEN t1.user_id IS NULL THEN 'Not in emails'
+     ELSE 'In both' 
+END AS grouping
+, COUNT(DISTINCT(CASE WHEN t0.user_id IS NULL THEN t1.user_id ELSE t0.user_id END)) 
+AS count_users
+FROM tutorial.experiments AS t0
+FULL JOIN tutorial.emails AS t1
+ON t0.user_id = t1.user_id
+GROUP BY grouping;
