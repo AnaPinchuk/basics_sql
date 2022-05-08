@@ -603,3 +603,115 @@ FROM tutorial.experiments AS t0
 FULL JOIN tutorial.emails AS t1
 ON t0.user_id = t1.user_id
 GROUP BY grouping;
+
+/* Лекция 6.
+Задание 1.
+Из таблицы es_orders
+
+Order_id - айдишку юзера
+Order_date - дату ордера
+Customer_id - айдишку кастомера
+Writer_id - айдишку исполнителя
+Order_total_USD - сумму в долларах
+Domain - домен сайта
+
+все оплаченные (is_paid_order = 1) не-тестовые (test_order = 0) ордера
+за 2019 год (order_date) на сайте edubirdie.com и всех его поддоменах
+(таблица es_site, связка по side_id)
+*/
+
+SELECT order_id, order_date, customer_id, writer_id, order_total_usd, domain
+FROM es_orders t0
+LEFT JOIN es_site t1 ON t0.site_id = t1.site_id
+WHERE test_order = 0
+AND is_paid_order = 1
+AND YEAR(order_date) = 2019
+AND DOMAIN LIKE '%edubirdie%';
+
+
+/* Лекция 6. Воркшоп з бустовской базой Edusson.
+Задание 2.
+Усложняем предыдущий запрос.
+
+Нам нужно добавить дату регистрации пользователя. Лежит в таблице
+es_users, столбец date_signup. Связка по полям customer_id и user_id.
+
+Нужно добавить нынешний статус заказа. Лежит в таблице es_order_state,
+столбец name. Связка по полям id и state_id.
+
+Нужно дополнительно отфильтровать, чтоб остались только FCO заказы,
+столбец is_first_client_order таблицы es_orders.
+*/
+
+SELECT t0.order_id, order_date, t3.name, customer_id, t2.date_signup, writer_id, order_total_usd, domain, is_first_client_order
+FROM es_orders t0
+LEFT JOIN es_site t1 ON t0.site_id = t1.site_id
+LEFT JOIN es_users t2 ON t2.user_id = t0.customer_id
+LEFT JOIN es_order_state t3 ON t3.id = t0.state_id
+WHERE test_order = 0
+AND is_paid_order = 1
+AND YEAR(order_date) = 2019
+AND DOMAIN LIKE '%edubirdie%'
+AND is_first_client_order = 1;
+
+/* Лекция 6. Воркшоп з бустовской базой Edusson.
+Задание 3.
+Усложняем предыдущий запрос.
+Теперь нас интересуют не только оплаченные а все ордера is_paid_order
+
+Нас интересует на какой лендинг приземлился пользователь при первом 
+взаимодействии с системой.
+Эта информация хранится в es_first_user_interaction_data, столбец internal_url, 
+связка по user_id и customer_id.
+
+Также, нас интересует не только доход (Revenue), но и прибыль (Profit). 
+Чтоб узнать прибыль от ордера, нужно от order_total_usd отнять райтерские writer_total,
+назовите столбцы Revenue и Profit соответственно.
+*/
+
+SELECT t0.order_id, order_date, t3.name, customer_id, 
+t2.date_signup, writer_id, order_total_usd AS Revenue, domain, is_first_client_order,
+t4.user_id, order_total_usd - writer_total AS Profit
+FROM es_orders t0
+LEFT JOIN es_site t1 ON t0.site_id = t1.site_id
+LEFT JOIN es_users t2 ON t2.user_id = t0.customer_id
+LEFT JOIN es_order_state t3 ON t3.id = t0.state_id
+LEFT JOIN es_first_user_interaction_data t4 ON t4.user_id = t0.customer_id
+WHERE test_order = 0
+-- AND is_paid_order = 0
+AND YEAR(order_date) = 2019
+AND DOMAIN LIKE '%edubirdie%'
+AND is_first_client_order = 1;
+
+
+/* Лекция 6. Воркшоп з бустовской базой Edusson.
+Задание 4.
+Усложняем предыдущий запрос.
+
+Финальный шаг - нужно подсчитать Palced2Paid, средний revenue и profit
+для FCO ордеров для каждого из лендингов. Для этого пошагово:
+
+1) Удалить из селекта всё, кроме order_id, revenue, profit и internal_url
+2) С помощью CASE создать новую колонку, куда order_id будет записываться
+только если is_paid_order = 1
+3) Поставить агрегационные фукнции на revenue и profit, COUNT DISTINCT 
+на order_id и новый case
+4) Сгруппировать по internal_url
+5) Поделить CASE на order_id, чтоб получить конверсию
+*/
+
+
+SELECT t4.internal_url
+, -- SUM(CASE WHEN is_paid_order = 1 THEN t0.order_id ELSE NULL END)
+, COUNT(DISTINCT(t0.order_id))
+, COUNT(DISTINCT(CASE WHEN is_paid_order = 1 THEN t0.order_id ELSE NULL END)) / COUNT(DISTINCT(t0.order_id)) * 100 AS Conversion
+, AVG(order_total_usd) AS Revenue
+, AVG(order_total_usd - writer_total) AS Profit
+FROM es_orders t0
+LEFT JOIN es_site t1 ON t0.site_id = t1.site_id
+LEFT JOIN es_first_user_interaction_data t4 ON t4.user_id = t0.customer_id
+WHERE test_order = 0
+AND YEAR(order_date) = 2019
+AND DOMAIN LIKE '%edubirdie%'
+AND is_first_client_order = 1
+GROUP BY t4.internal_url;
